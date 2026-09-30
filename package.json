@@ -1,0 +1,16 @@
+{
+  "name": "coos-danmu-runtime",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18.17.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.8",
+    "jsdom": "25.0.1"
+  }
+}
