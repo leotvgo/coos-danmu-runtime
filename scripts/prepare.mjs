@@ -17,7 +17,7 @@ for (const dir of ['scripts', 'src', 'test']) {
     const path = dir + '/' + name; hash.update(path).update(await readFile(join(root, path)));
   }
 }
-for (const path of ['package-lock.json']) hash.update(path).update(await readFile(join(root, path)));
+for (const path of ['package-lock.json', '.github/workflows/update-danmu.yml']) hash.update(path).update(await readFile(join(root, path)));
 const recipe = hash.digest('hex');
 let previous;
 const response = await fetch('https://github.com/leotvgo/coos-danmu-runtime/releases/download/danmu-stable/manifest.json', { signal: AbortSignal.timeout(30000) });
