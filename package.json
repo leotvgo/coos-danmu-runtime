@@ -12,5 +12,6 @@
   "devDependencies": {
     "esbuild": "0.25.8",
     "jsdom": "25.0.1"
-  }
+  },
+  "version": "0.1.0"
 }
