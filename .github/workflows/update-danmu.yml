@@ -1,0 +1,87 @@
+name: Build verified upstream danmu component
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/update-danmu.yml'
+      - 'scripts/**'
+      - 'src/**'
+      - 'test/**'
+      - 'package-lock.json'
+permissions:
+  contents: read
+concurrency:
+  group: verified-danmu-channel
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.repository == 'leotvgo/coos-danmu-runtime'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      needed: ${{ steps.prepare.outputs.needed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned build dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+      - id: prepare
+        name: Resolve upstream commit and dependency lock
+        run: node scripts/prepare.mjs "$RUNNER_TEMP/danmu"
+      - name: Build CJS and archive corresponding source
+        if: steps.prepare.outputs.needed == 'true'
+        env:
+          RECIPE: ${{ steps.prepare.outputs.recipe }}
+        run: |
+          node scripts/build.mjs "$RUNNER_TEMP/danmu/upstream" "$RUNNER_TEMP/danmu/artifact" "$RECIPE" "$GITHUB_SHA"
+          mkdir -p "$RUNNER_TEMP/danmu/corresponding-source/adapter"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/danmu/corresponding-source/adapter"
+          tar --exclude=.git --exclude=node_modules -cf - -C "$RUNNER_TEMP/danmu" upstream | tar -x -C "$RUNNER_TEMP/danmu/corresponding-source"
+          tar -czf "$RUNNER_TEMP/danmu/artifact/source.tar.gz" -C "$RUNNER_TEMP/danmu/corresponding-source" upstream adapter
+      - name: Verify UI, upload, matching, persistence and standalone runtime on Node 24
+        if: steps.prepare.outputs.needed == 'true'
+        working-directory: .
+        run: DANMU_ARTIFACT_DIR="$RUNNER_TEMP/danmu/artifact" npm test
+      - uses: actions/setup-node@v4
+        if: steps.prepare.outputs.needed == 'true'
+        with:
+          node-version: '18.17.1'
+      - name: Verify component on exact Node 18.17.1
+        if: steps.prepare.outputs.needed == 'true'
+        working-directory: .
+        run: DANMU_ARTIFACT_DIR="$RUNNER_TEMP/danmu/artifact" npm test
+      - uses: actions/upload-artifact@v4
+        if: steps.prepare.outputs.needed == 'true'
+        with:
+          name: verified-danmu
+          path: ${{ runner.temp }}/danmu/artifact/
+          retention-days: 7
+  publish:
+    needs: build
+    if: needs.build.outputs.needed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-danmu
+          path: ${{ runner.temp }}/danmu-publish
+      - name: Publish immutable component, then promote channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/publish.mjs "$RUNNER_TEMP/danmu-publish"
