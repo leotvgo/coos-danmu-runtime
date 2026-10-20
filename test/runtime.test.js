@@ -40,6 +40,8 @@ test('complete management interface initializes and supports original configurat
   const vc=new VirtualConsole();vc.on('jsdomError',error=>errors.push(error.name));
   const dom=new JSDOM(page.body.toString(),{url:'http://127.0.0.1:9321/test-admin/',runScripts:'dangerously',virtualConsole:vc,beforeParse(window){
     window.matchMedia=()=>({matches:false,addEventListener(){},addListener(){}});
+    window.requestAnimationFrame=callback=>setTimeout(()=>callback(Date.now()),0);
+    window.cancelAnimationFrame=handle=>clearTimeout(handle);
     window.fetch=async(url,options={})=>{
       active++;const u=new URL(url,'http://127.0.0.1:9321/test-admin/');if(u.pathname.endsWith('/api/config'))configCalls++;
       try {const r=await client.request({method:options.method||'GET',path:u.pathname+u.search,origin:u.origin,headers:options.headers,body:options.body});
